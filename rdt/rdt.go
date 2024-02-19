@@ -31,7 +31,7 @@
 // 
 
 
-package rdtudp
+package rdt
 
 import (
 	"net"
@@ -42,9 +42,10 @@ import (
 
 
 // (m,i) Read()
-func (rdtconn *RDTConn) Read(b []byte) (int,error) {
+//func (rdtconn *RDTConn) Read(b []byte) (int,error) {
 
-	n, err := 
+//	n, err := 
+//}
 
 
 // (m,i) Write()
@@ -53,6 +54,7 @@ func (rdtconn *RDTConn) Read(b []byte) (int,error) {
 
 
 // (m) ReadFromRDT()
+//func (rdtconn *RDTConn) ReadFromRDT()
 
 
 // (m) WriteToRDT()
@@ -74,13 +76,13 @@ func (rdtconn *RDTConn) Read(b []byte) (int,error) {
 // @param laddr: Local address
 // @param raddr: Remote address
 // 
-// @return (rdtconn,err): New outgoing RDT UDP connection
+// @return (rdtconn,err): New outgoing RDT connection
 // 
-// Similar to net.DialUDP() - establishes a new outgoing RDT UDP connection.
+// Similar to net.Dial() - establishes a new outgoing RDT connection.
 // 
-func DialRDT(network string, laddr, raddr *net.UDPAddr) (*RDTConn,error) {
+func DialRDT(network string, laddr, raddr net.Addr) (*RDTConn,error) {
 
-	conn, err := DialUDP(network, laddr, raddr)
+	conn, err := net.Dial(network, raddr.String())
 	if err != nil {
 		return nil,err
 	}
@@ -98,9 +100,14 @@ func DialRDT(network string, laddr, raddr *net.UDPAddr) (*RDTConn,error) {
 // 
 // Similar to net.ListenUDP() - establishes a new incoming RDT UDP connection.
 // 
-func ListenRDT(network string, laddr *net.UDPAddr) (*RDTConn, error) {
+func ListenRDT(network string, laddr net.Addr) (*RDTConn, error) {
 
-	conn, err := ListenUDP(network, laddr)
+	listener, err := net.Listen(network, laddr.String())
+	if err != nil {
+		return nil,err
+	}
+
+	conn, err := listener.Accept()
 	if err != nil {
 		return nil,err
 	}
