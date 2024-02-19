@@ -16,22 +16,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("len: ", len(str))
-
-	lenstr, err := pkt.String()
+	pktstr, err := pkt.String()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	fmt.Println("encoded: ", lenstr)
-
-	length, err := rdt.Atoi32(lenstr)
+	pkt, err = rdt.ParsePacket(pktstr)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	fmt.Println("parsed len: ", length)
+	fmt.Println("data: ", pkt.Data())
 }
 
