@@ -13,7 +13,7 @@ func main() {
 
 	str := "Hello World!\n"
 
-	conn, err := rdt.DialRDT("tcp", ":9992")
+	conn, err := rdt.DialRDT("udp", ":9992")
 	if err != nil {
 		log.Fatal(err)
 	}
