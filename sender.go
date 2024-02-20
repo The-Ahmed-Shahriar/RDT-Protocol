@@ -3,31 +3,22 @@ package main
 import (
 	"a2/rdt"
 	"fmt"
-	"os"
+	"log"
 )
+
+
+
 
 func main() {
 
-	str := "Hello World!\n"
+	// str := "Hello World!\n"
 
-	pkt, err := rdt.Packet(1,1,str)
+	conn, err := rdt.DialRDT("tcp", ":9992")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
+	defer conn.Close()
 
-	pktstr, err := pkt.String()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	pkt, err = rdt.ParsePacket(pktstr)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	fmt.Println("data: ", pkt.Data())
+	fmt.Println("Success!")
 }
 

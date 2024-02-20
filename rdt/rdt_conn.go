@@ -42,10 +42,10 @@ import (
 
 
 // (m,i) Read()
-//func (rdtconn *RDTConn) Read(b []byte) (int,error) {
-
-//	n, err := 
-//}
+// func (rdtconn *RDTConn) Read(b []byte) (int,error) {
+// 
+// 	n, err := RDTC
+// }
 
 
 // (m,i) Write()
@@ -53,36 +53,19 @@ import (
 
 
 
-// (m) ReadFromRDT()
-//func (rdtconn *RDTConn) ReadFromRDT()
-
-
-// (m) WriteToRDT()
-
-
-
-
-// (m) WriteACK()
-
-
-// (m) WriteEOT()
-
-
-
-
-// DialRDT()
+// (s) DialRDT()
 // 
-// @param network: Network type (udp, udp4, udp6)
-// @param laddr: Local address
-// @param raddr: Remote address
+// @param network: network type (recommended type: udp, udp4, udp6)
+// @param address: connection remote address
 // 
 // @return (rdtconn,err): New outgoing RDT connection
 // 
 // Similar to net.Dial() - establishes a new outgoing RDT connection.
 // 
-func DialRDT(network string, laddr, raddr net.Addr) (*RDTConn,error) {
+func DialRDT(network, address string) (*RDTConn,error) {
 
-	conn, err := net.Dial(network, raddr.String())
+	// Simply establish an outgoing connection
+	conn, err := net.Dial(network, address)
 	if err != nil {
 		return nil,err
 	}
@@ -91,25 +74,47 @@ func DialRDT(network string, laddr, raddr net.Addr) (*RDTConn,error) {
 }
 
 
-// ListenRDT()
+// (s) ListenRDT()
 // 
-// @param network: Network type (udp, udp4, udp6)
+// @param network: network type (recommended type: udp, udp4, udp6)
 // @param laddr: Local address
 // 
-// @return (rdtconn,err) - New incoming RDT UDP connection
+// @return (rdtconn,err) - New incoming RDT connection
 // 
-// Similar to net.ListenUDP() - establishes a new incoming RDT UDP connection.
+// Similar to net.Listen() - establishes a new incoming RDT connection. Note the
+// difference however; the function blocks until an incoming connection is found.
 // 
-func ListenRDT(network string, laddr net.Addr) (*RDTConn, error) {
+func ListenRDT(network, address string) (*RDTConn, error) {
 
-	listener, err := net.Listen(network, laddr.String())
-	if err != nil {
-		return nil,err
-	}
+	var conn net.Conn
+	switch network {
 
-	conn, err := listener.Accept()
-	if err != nil {
-		return nil,err
+	case "udp","udp4","udp6":
+		// Use UDP interface; this is not a modular solution for this, unfortunately.
+		// And to be honest, this is the best I can come up with atm
+		addr, err := net.ResolveUDPAddr(network, address)
+		if err != nil {
+			return nil,err
+		}
+
+		conn, err = net.ListenUDP(network, addr)
+		if err != nil {
+			return nil,err
+		}
+
+	default:
+		// Start listening for RDT connection requests
+		listener, err := net.Listen(network, address)
+		if err != nil {
+			return nil,err
+		}
+		defer listener.Close()
+
+		// Accept connection request (blocking!)
+		conn, err = listener.Accept()
+		if err != nil {
+			return nil,err
+		}
 	}
 
 	return &RDTConn{conn},nil
@@ -118,7 +123,7 @@ func ListenRDT(network string, laddr net.Addr) (*RDTConn, error) {
 
 
 
-// (m,i) Close()
+// (m,i,x) Close()
 // 
 // @return err
 // 

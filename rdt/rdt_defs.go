@@ -8,6 +8,7 @@
 // 	const INT_SIZE
 // 	const DATA_SIZE
 // 	const PKT_SIZE
+// 	var EOT *RDTPacket
 // 
 // Errors:
 // 	var INVALID_PKT_INT
@@ -49,6 +50,10 @@ var (
 	INVALID_PKT_INT = errors.New("ERROR: Packet expects 32 bit / 4 byte integer\n")
 	INVALID_PKT_STR = errors.New("ERROR: Packet expects no more than 500 bytes of data\n")
 )
+
+
+// Define the default EOT packet
+var EOT *RDTPacket = &RDTPacket{ 2, 0, 0, "" }
 
 
 
