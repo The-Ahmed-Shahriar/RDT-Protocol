@@ -35,6 +35,8 @@ package rdt
 
 import (
 	"net"
+	"fmt"
+	"io"
 	"time"
 )
 
@@ -42,13 +44,89 @@ import (
 
 
 // (m,i) Read()
-// func (rdtconn *RDTConn) Read(b []byte) (int,error) {
-// 
-// 	n, err := RDTC
-// }
+func (rdtconn *RDTConn) Read(b []byte) (int,error) {
+
+	N := 0
+
+	// Keep reading packets until EOT received
+	for {
+		var data [PKT_SIZE]byte
+
+		// Read raw data from underlying connection
+		n, err := rdtconn.Conn.Read(data[0:])
+		if err != nil && err != io.EOF {
+			return N,err
+		}
+		fmt.Println("\t> READ!")
+
+		// Unmarshall the received data into RDT packet
+		packet, err := ParsePacket(string(data[0:]))
+		if err != nil {
+			return N,err
+		}
+		fmt.Println("\t> UNMARSHALLED!")
+
+		// Stop reading if EOT packet found
+		if packet.IsEOT() {
+			break
+		}
+		fmt.Println("\t> NO EOT!")
+
+		// Copy data portion to output slice
+		copy(b[N:], packet.Data())
+		N += n
+		fmt.Println("\t> COPIED!\n")
+	}
+
+	return N,nil
+}
 
 
 // (m,i) Write()
+func (rdtconn *RDTConn) Write(b []byte) (int,error) {
+
+	N := 0
+	numpkts := 1+len(b)/DATA_SIZE
+
+	// Break message into DATA_SIZE pieces to packet
+	for i := 0; i < numpkts; i++ {
+
+		// Fix message chunk end index
+		end := N+DATA_SIZE
+		if end > len(b) {
+			end = len(b)
+		}
+
+		// Marshall data into a packet
+		packet, err := Packet(0, i, string(b[N:end]))
+		if err != nil {
+			return N,err
+		}
+
+		// Write raw data to underlying connection
+		str, err := packet.String()
+		if err != nil {
+			return N,err
+		}
+
+		n, err := rdtconn.Conn.Write([]byte(str))
+		if err != nil {
+			return N,err
+		}
+		N += n
+	}
+
+	// Write EOT packet
+	str, err := EOT.String()
+	if err != nil {
+		return N,err
+	}
+	fmt.Println("EOT len: ", len(str))
+	_, err = rdtconn.Conn.Write([]byte(str))
+	fmt.Println("\t> EOT SENT!")
+
+	return N,err
+}
 
 
 

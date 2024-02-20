@@ -111,6 +111,11 @@ func (packet *RDTPacket) Data() string {
 }
 
 
+func (packet *RDTPacket) IsEOT() bool {
+	return packet.ptype == EOT.ptype
+}
+
+
 
 
 func Itoa32(num int) (string,error) {

@@ -17,6 +17,15 @@ func main() {
 	}
 	defer conn.Close()
 
+	var data [rdt.DATA_SIZE]byte
+	fmt.Println("test ^")
+	_, err = conn.Read(data[0:])
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("test $")
+
+	fmt.Println("> " + string(data[0:]))
 	fmt.Println("Success!")
 }
 
