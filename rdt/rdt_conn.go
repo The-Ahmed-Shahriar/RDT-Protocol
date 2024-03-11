@@ -53,18 +53,18 @@ func (rdtconn *RDTConn) Read(b []byte) (int,error) {
 		}
 
 		// Unmarshall the received data into RDT packet
-		packet, err := ParsePacket(string(data[0:]))
+		pkt, err := ParsePacket(string(data[0:]))
 		if err != nil {
 			return N,err
 		}
 
 		// Stop reading if EOT packet found
-		if packet.IsEOT() {
+		if pkt.Ptype() == EOT_PKT {
 			break
 		}
 
 		// Copy data portion to output slice
-		copy(b[N:], packet.Data())
+		copy(b[N:], pkt.Data())
 		N += n
 	}
 
@@ -95,13 +95,13 @@ func (rdtconn *RDTConn) Write(b []byte) (int,error) {
 		}
 
 		// Marshall data into a packet
-		packet, err := Packet(0, i, string(b[N:end]))
+		pkt, err := PacketData(i, string(b[N:end]))
 		if err != nil {
 			return N,err
 		}
 
 		// Write raw data to underlying connection
-		str, err := packet.String()
+		str, err := pkt.String()
 		if err != nil {
 			return N,err
 		}
@@ -114,7 +114,7 @@ func (rdtconn *RDTConn) Write(b []byte) (int,error) {
 	}
 
 	// Write EOT packet
-	str, err := EOT.String()
+	str, err := PacketEOT().String()
 	if err != nil {
 		return N,err
 	}

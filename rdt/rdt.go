@@ -14,9 +14,7 @@ package rdt
 
 
 import (
-	"io"
-	"log"
-	"maps"
+	"net"
 	"os"
 	"time"
 )
@@ -34,7 +32,7 @@ func (rdtconn *RDTConn) SendFile(filename string) error {
 		return err
 	}
 
-	file, err := os.OpenFile(filename, os.O_RDONLY, 0755)
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0666)
 	if err != nil {
 		return err
 	}
@@ -51,7 +49,7 @@ func (rdtconn *RDTConn) SendFile(filename string) error {
 func (rdtconn *RDTConn) ReceiveFile(filename string) error {
 
 	// Validate and open file
-	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0755)
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
@@ -94,7 +92,7 @@ func StartRDT(network, inAddress, outAddress string, timeout time.Duration) (*RD
 		return nil,err
 	}
 
-	outConn, err = net.ListenUDP(network, outAddr)
+	outConn, err := net.DialUDP(network, nil, outAddr)
 	if err != nil {
 		inConn.Close()
 		return nil,err

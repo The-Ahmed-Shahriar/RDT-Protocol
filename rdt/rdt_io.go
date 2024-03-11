@@ -15,6 +15,7 @@ package rdt
 
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -36,7 +37,6 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 
 	var N int64 = 0
 	var sendbase int = 0
-	var ackbase int = 0
 
 	var seqlog, acklog *log.Logger
 
@@ -45,20 +45,20 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 
 	// Enable logging
 	if LOGGING_ON {
-		seqfile, err := os.OpenFile(SEQNUM_LOG, os.O_WRONLY|os.O_CREATE, 0755)
+		seqfile, err := os.OpenFile(SEQNUM_LOG, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			return N,err
 		}
 		defer seqfile.Close()
 
-		ackfile, err := os.OpenFile(ACK_LOG, os.O_WRONLY|os.O_CREATE, 0755)
+		ackfile, err := os.OpenFile(ACK_LOG, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			return N,err
 		}
 		defer seqfile.Close()
 
 		seqlog = log.New(seqfile, "", 0)
-		acklog = log.New(seqfile, "", 0)
+		acklog = log.New(ackfile, "", 0)
 	}
 
 	// Use EOT procedure before exiting function - kill receiver
@@ -68,7 +68,13 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 		if LOGGING_ON {
 			seqlog.Println("EOT")
 		}
-		_, err := rdtconn.OutConn.Write([]byte(PacketEOT().String()))
+
+		str, err := PacketEOT().String()
+		if err != nil {
+			return
+		}
+
+		_, err = rdtconn.OutConn.Write([]byte(str))
 		if err != nil {
 			return
 		}
@@ -83,7 +89,9 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 			}
 
 			pkt, err := ParsePacket(string(data[0:]))
-			if pkt.Ptype() == EOT_PKT {
+			if err != nil {
+				return
+			} else if pkt.Ptype() == EOT_PKT {
 				break
 			} else if LOGGING_ON && pkt.Ptype() == ACK_PKT {
 				acklog.Println(pkt.Seqnum())
@@ -149,7 +157,7 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 				<-processing
 				continue
 			}
-			if ack.Ptype != ACK_PKT {
+			if ack.Ptype() != ACK_PKT {
 				<-processing
 				return
 			}
@@ -162,9 +170,10 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 			}
 
 			// Remove the corresponding pkt from batch
-			acklog.Println(ack.Seqnum())
+			if LOGGING_ON {
+				acklog.Println(ack.Seqnum())
+			}
 			delete(batch, ack.Seqnum())
-
 			<-processing
 		}
 	}()
@@ -173,6 +182,8 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 	/* START FSM */
 	readerEOF := false
 	for {
+		fmt.Println("FSM ReadFrom (Sender): ", sendbase)
+
 		// Load batch with new pkts
 		for !readerEOF && len(batch) < BATCH_SIZE {
 
@@ -191,7 +202,7 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 			// Construct and buffer new pkt
 			batch[sendbase], err = PacketData(sendbase, string(data[0:]))
 			sendbase++
-			N += batch[sendbase].Length()
+			N += int64(batch[sendbase].Length())
 		}
 
 		// Halt if source depleted and all pkts acknowledged
@@ -201,7 +212,18 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 
 		// Send batch
 		for _, pkt := range batch {
-			_, err := rdtconn.OutConn.Write([]byte(pkt.String()))
+
+			if LOGGING_ON {
+				seqlog.Println(pkt.Seqnum())
+			}
+
+			str, err := pkt.String()
+			if err != nil {
+				halted <- true
+				return N,err
+			}
+
+			_, err = rdtconn.OutConn.Write([]byte(str))
 			if err != nil {
 				halted <- true
 				return N,err
@@ -247,7 +269,7 @@ func (rdtconn *RDTConn) WriteTo(w io.Writer) (int64,error) {
 
 	// Enable logging
 	if LOGGING_ON {
-		arvfile, err := os.OpenFile(ACK_LOG, os.O_WRONLY|os.O_CREATE, 0755)
+		arvfile, err := os.OpenFile(ARRIVAL_LOG, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			return N,err
 		}
@@ -261,8 +283,14 @@ func (rdtconn *RDTConn) WriteTo(w io.Writer) (int64,error) {
 		if LOGGING_ON {
 			arvlog.Println("EOT")
 		}
-		rdtconn.OutConn.Write([]byte(PacketEOT().String))
-	}
+
+		str, err := PacketEOT().String()
+		if err != nil {
+			return
+		}
+
+		rdtconn.OutConn.Write([]byte(str))
+	}()
 
 	// Initialize data buffer
 	databuff = make(map[int]string)
@@ -270,14 +298,16 @@ func (rdtconn *RDTConn) WriteTo(w io.Writer) (int64,error) {
 
 	/* START FSM */
 	for {
+		fmt.Println("FSM WriteTo (Receiver): ", rcvbase)
+
 		var pktbin [PKT_SIZE]byte
 
 		// Read next incoming packet (blocking call)
-		_, err = rdtconn.InConn.Read(pktbin)
+		_, err := rdtconn.InConn.Read(pktbin[0:])
 		if err != nil {
 			return N,err
 		}
-		pkt, err := ParsePacket(string(pktbin))
+		pkt, err := ParsePacket(string(pktbin[0:]))
 		if err != nil {
 			return N,err
 		}
@@ -295,7 +325,11 @@ func (rdtconn *RDTConn) WriteTo(w io.Writer) (int64,error) {
 		if err != nil {
 			return N,err
 		}
-		_, err = rdt.OutConn.Write([]byte(ack.String()))
+		str, err := ack.String()
+		if err != nil {
+			return N,err
+		}
+		_, err = rdtconn.OutConn.Write([]byte(str))
 		if err != nil {
 			return N,err
 		}
@@ -308,7 +342,7 @@ func (rdtconn *RDTConn) WriteTo(w io.Writer) (int64,error) {
 
 		// Store new data in buffer
 		databuff[pkt.Seqnum()] = pkt.Data()
-		N += pkt.Length()
+		N += int64(pkt.Length())
 
 		// Update rcvbase, migrating any contiguous data onto file
 		for {

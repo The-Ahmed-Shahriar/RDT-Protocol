@@ -1,5 +1,5 @@
 // 
-// rdt_packet.go
+// rdt_pkt.go
 // 
 // Implements the basic RDT packet data structure's functionalities.
 // This file implements the following:
@@ -32,26 +32,26 @@ func ParsePacket(str string) (Packet,error) {
 	// Decode integer parts
 	ptype,err := Atoi32(str[0:4])
 	if err != nil {
-		return nil,err
+		return Packet{0, 0, 0, ""},err
 	}
 
 	seqnum,err := Atoi32(str[4:8])
 	if err != nil {
-		return nil,err
+		return Packet{0, 0, 0, ""},err
 	}
 
 	length,err := Atoi32(str[8:12])
 	if err != nil {
-		return nil,err
+		return Packet{0, 0, 0, ""},err
 	}
 
 	// Extract string message with checks
 	if length > DATA_SIZE {
-		return nil,INVALID_PKT_STR
+		return Packet{0, 0, 0, ""},INVALID_PKT_STR
 	}
 	msg := str[12:12+length]
 
-	return Packet(ptype,seqnum,msg)
+	return Packet{ptype, seqnum, length, msg},nil
 }
 
 
@@ -59,15 +59,15 @@ func PacketData(seqnum int, msg string) (Packet,error) {
 
 	// Check sequence number size
 	if uint32(seqnum) > ^uint32(0) {
-		return nil,INVALID_PKT_INT
+		return Packet{0, 0, 0, ""},INVALID_PKT_INT
 	}
 
 	// Check message data length
 	if len(msg) > DATA_SIZE {
-		return nil,INVALID_PKT_STR
+		return Packet{0, 0, 0, ""},INVALID_PKT_STR
 	}
 
-	packet := Packet{DATA_PKT,seqnum,len(msg),msg}
+	packet := Packet{DATA_PKT, seqnum, len(msg), msg}
 	return packet,nil
 }
 
@@ -76,16 +76,16 @@ func PacketACK(seqnum int) (Packet,error) {
 
 	// Check sequence number size
 	if uint32(seqnum) > ^uint32(0) {
-		return nil,INVALID_PKT_INT
+		return Packet{0, 0, 0, ""},INVALID_PKT_INT
 	}
 
-	packet := Packet{ACK_PKT,seqnum,0,""}
+	packet := Packet{ACK_PKT, seqnum, 0, ""}
 	return packet,nil
 }
 
 
 func PacketEOT() Packet {
-	packet := Packet{EOT_PKT, 0, 0,""}
+	packet := Packet{EOT_PKT, 0, 0, ""}
 	return packet
 }
 

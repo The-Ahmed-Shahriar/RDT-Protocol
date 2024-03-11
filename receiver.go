@@ -39,11 +39,11 @@ func GetArgs() (string,string,string) {
 
 	// Validate number of args
 	if len(os.Args) != 5 {
-		fmt.Println("usage: <receiver script> <remote hostname> :<remote data port> :<local data port> <filename>")
+		fmt.Println("usage: <receiver script> <remote hostname> <remote data port> <local data port> <filename>")
 		os.Exit(1)
 	}
 
 	// Validate port number format
 
-	return os.Args[3], os.Args[1]+os.Args[2], os.Args[4]
+	return ":"+os.Args[3], os.Args[1]+":"+os.Args[2], os.Args[4]
 }

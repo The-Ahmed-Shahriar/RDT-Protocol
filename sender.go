@@ -41,7 +41,7 @@ func GetArgs() (string,string,time.Duration,string) {
 
 	// Validate number of args
 	if len(os.Args) != 6 {
-		fmt.Println("usage: <sender script> <remote hostname> :<remote data port> :<local ack port> <timeout (ms)> <filename>")
+		fmt.Println("usage: <sender script> <remote hostname> <remote data port> <local ack port> <timeout (ms)> <filename>")
 		os.Exit(1)
 	}
 
@@ -52,6 +52,7 @@ func GetArgs() (string,string,time.Duration,string) {
 	if err != nil || t < 1 {
 		fmt.Println("ERROR: Invalid timeout format")
 	}
+	timeout := time.Duration(t) * time.Millisecond
 
-	return os.Args[3], os.Args[1]+os.Args[2], t*time.Millisecond(), os.Args[5]
+	return ":"+os.Args[3], os.Args[1]+":"+os.Args[2], timeout, os.Args[5]
 }

@@ -14,6 +14,10 @@
 // 	const PKT_ACK
 // 	const PKT_EOT
 // 
+// 	const SEQNUM_LOG
+// 	const ACK_LOG
+// 	const ARRIVAL_LOG
+// 
 // 	const Q1,Q2,Q3,Q4
 // 
 // 	const LOGGING_ON
@@ -32,6 +36,7 @@ package rdt
 import (
 	"errors"
 	"net"
+	"time"
 )
 
 
@@ -50,7 +55,14 @@ const (
 	ACK_PKT = 0
 	DATA_PKT = 1
 	EOT_PKT = 2
-}
+)
+
+// Define log filenames
+const (
+	SEQNUM_LOG = "seqnum.log"
+	ACK_LOG = "ack.log"
+	ARRIVAL_LOG = "arrival.log"
+)
 
 // Define byte masks, from MSD to LSD (Big Endian)
 const (
