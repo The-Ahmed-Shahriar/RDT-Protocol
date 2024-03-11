@@ -15,7 +15,6 @@ package rdt
 
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -117,28 +116,29 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 	// Immediately start goroutine that always reads for responses
 	go func() {
 
-		// Initial blocking to sync with timer
-		select {
-		case <-timerOn:
-			break
-		case <-halted:
-			return
-		}
-
+		// Reset any deadline restrictions
+		defer rdtconn.SetReadDeadline(time.Time{})
 
 		for {
+
 			var data [PKT_SIZE]byte
 
-			// Always read for responses
-			// (blocking, error handled, exits on halt)
+
+			// Seek authority to start reading from socket
+			select {
+			case <-timerOn:
+				break
+			case <-halted:
+				return
+			}
+
+			// Always read for responses; Preempt after 1ms
+			rdtconn.SetReadDeadline(time.Now().Add(time.Millisecond))
 			_, err := rdtconn.InConn.Read(data[0:])
+
+			// Handle read error
 			if err != nil {
-				select {
-				case <-halted:
-					return
-				default:
-					continue
-				}
+				continue
 			}
 
 			// Block until timer started or halt triggered
@@ -182,7 +182,6 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 	/* START FSM */
 	readerEOF := false
 	for {
-		fmt.Println("FSM ReadFrom (Sender): ", sendbase)
 
 		// Load batch with new pkts
 		for !readerEOF && len(batch) < BATCH_SIZE {
@@ -190,7 +189,7 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 			var data [DATA_SIZE]byte
 
 			// Fetch next 500 bytes from source
-			_, err := r.Read(data[0:])
+			n, err := r.Read(data[0:])
 			if err == io.EOF {
 				readerEOF = true
 				break
@@ -200,7 +199,7 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 			}
 
 			// Construct and buffer new pkt
-			batch[sendbase], err = PacketData(sendbase, string(data[0:]))
+			batch[sendbase], err = PacketData(sendbase, string(data[0:n]))
 			sendbase++
 			N += int64(batch[sendbase].Length())
 		}
@@ -232,13 +231,27 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 
 		// Run timer on duration
 		timer := time.NewTimer(rdtconn.timeout)
-		for len(timer.C) > 0 {
-			if len(timerOn) == 0 {
-				timerOn <- true
+
+		// Branch reset point
+		timerCheckPoint:
+
+		// Keep ACK handler functioning while timer running and all ACKs not received
+		select {
+		case <-timer.C:
+		default:
+			if len(batch) > 0 {
+
+				if len(timerOn) == 0 {
+					timerOn <- true
+				}
+				goto timerCheckPoint
+
+			} else {
+				timer.Stop()
 			}
 		}
 
-		// Sync if a response is still being processed
+		// Sync here, in case response is still being processed
 		for len(processing) > 0 {}
 	}
 
@@ -298,7 +311,6 @@ func (rdtconn *RDTConn) WriteTo(w io.Writer) (int64,error) {
 
 	/* START FSM */
 	for {
-		fmt.Println("FSM WriteTo (Receiver): ", rcvbase)
 
 		var pktbin [PKT_SIZE]byte
 

@@ -30,17 +30,17 @@ package rdt
 func ParsePacket(str string) (Packet,error) {
 
 	// Decode integer parts
-	ptype,err := Atoi32(str[0:4])
+	ptype, err := Atoi32(str[0:4])
 	if err != nil {
 		return Packet{0, 0, 0, ""},err
 	}
 
-	seqnum,err := Atoi32(str[4:8])
+	seqnum, err := Atoi32(str[4:8])
 	if err != nil {
 		return Packet{0, 0, 0, ""},err
 	}
 
-	length,err := Atoi32(str[8:12])
+	length, err := Atoi32(str[8:12])
 	if err != nil {
 		return Packet{0, 0, 0, ""},err
 	}
@@ -149,12 +149,14 @@ func Itoa32(num int) (string,error) {
 	}
 
 	// Construct 4 byte string
-	str := string((num & Q1) >> 24)
-	str += string((num & Q2) >> 16)
-	str += string((num & Q3) >> 8)
-	str += string(num & Q4)
+	var encoding [INT_SIZE]byte
 
-	return str,nil
+	encoding[0] = byte((num & Q1) >> 24)
+	encoding[1] = byte((num & Q2) >> 16)
+	encoding[2] = byte((num & Q3) >> 8)
+	encoding[3] = byte(num & Q4)
+
+	return string(encoding[0:]),nil
 }
 
 
