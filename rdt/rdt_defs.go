@@ -8,14 +8,22 @@
 // 	const INT_SIZE
 // 	const DATA_SIZE
 // 	const PKT_SIZE
-// 	var EOT *RDTPacket
+// 	const BATCH_SIZE
+// 
+// 	const PKT_DATA
+// 	const PKT_ACK
+// 	const PKT_EOT
+// 
+// 	const Q1,Q2,Q3,Q4
+// 
+// 	const LOGGING_ON
 // 
 // Errors:
 // 	var INVALID_PKT_INT
 // 	var INVALID_PKT_STR
 // 
 // Data Structures:
-// 	type RDTPacket struct
+// 	type Packet struct
 // 	type RDTConn struct
 // 
 
@@ -28,13 +36,21 @@ import (
 
 
 
-// Define package contants
+// Define size contants
 const (
 	INT_SIZE = 4
 	DATA_SIZE = 500
 	PKT_SIZE = 512
+
+	BATCH_SIZE = 10
 )
 
+// Define packet type constants
+const (
+	ACK_PKT = 0
+	DATA_PKT = 1
+	EOT_PKT = 2
+}
 
 // Define byte masks, from MSD to LSD (Big Endian)
 const (
@@ -44,6 +60,11 @@ const (
 	Q4 = 0x000000FF
 )
 
+// Flag for enabling logging
+const LOGGING_ON = true
+
+
+
 
 // Define error types
 var (
@@ -52,16 +73,12 @@ var (
 )
 
 
-// Define the default EOT packet
-var EOT *RDTPacket = &RDTPacket{ 2, 0, 0, "" }
-
-
 
 
 // Packet struct, following the specified packet format in assignment details
 // The total size (512 bytes) for the RDTPacket structures are ensured in 
 // the structures implementation
-type RDTPacket struct {
+type Packet struct {
 	ptype int
 	seqnum int
 	length int
@@ -72,8 +89,11 @@ type RDTPacket struct {
 
 
 // Connection wrapper implementing the Reliable Data Transfer (RDT) functionality
-// over a generic connection type, net.Conn
+// over two UDP connections. The struct also comes with a general use packet buffer
+// (can be used different for implementing various read/write type methods).
 type RDTConn struct {
-	Conn net.Conn
+	InConn *net.UDPConn
+	OutConn *net.UDPConn
+	timeout time.Duration
 }
 

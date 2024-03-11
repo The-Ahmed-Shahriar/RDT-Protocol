@@ -4,8 +4,22 @@
 // Implements the basic RDT packet data structure's functionalities.
 // This file implements the following:
 // 
-// Functions:
-// 	func Packet(ptype, seqnum int, msg string) (*RDTPacket,error)
+// Constructors:
+// 	func ParsePacket(str string) (Packet,error)
+// 	func PacketData(seqnum int, msg string) (Packet,error)
+// 	func PacketACK(seqnum int) (Packet,error)
+// 	func PacketEOT() Packet
+// 
+// Methods:
+// 	func (packet Packet) String() (string,error)
+// 	func (packet Packet) Ptype() int
+// 	func (packet Packet) Seqnum() int
+// 	func (packet Packet) Length() int
+// 	func (packet Packet) Data() string
+// 
+// Conversions:
+// 	func Itoa32(num int) (string,error)
+// 	func Atoi32(str string) (int,error)
 // 
 
 package rdt
@@ -13,30 +27,7 @@ package rdt
 
 
 
-func Packet(ptype, seqnum int, msg string) (*RDTPacket,error) {
-
-	// Check integer sizes
-	if uint32(ptype) > ^uint32(0) {
-		return nil,INVALID_PKT_INT
-	}
-
-	if uint32(seqnum) > ^uint32(0) {
-		return nil,INVALID_PKT_INT
-	}
-
-	// Check message data length
-	if len(msg) > DATA_SIZE {
-		return nil,INVALID_PKT_STR
-	}
-
-	packet := &RDTPacket{ptype,seqnum,len(msg),msg}
-	return packet,nil
-}
-
-
-
-
-func ParsePacket(str string) (*RDTPacket,error) {
+func ParsePacket(str string) (Packet,error) {
 
 	// Decode integer parts
 	ptype,err := Atoi32(str[0:4])
@@ -64,7 +55,44 @@ func ParsePacket(str string) (*RDTPacket,error) {
 }
 
 
-func (packet *RDTPacket) String() (string,error) {
+func PacketData(seqnum int, msg string) (Packet,error) {
+
+	// Check sequence number size
+	if uint32(seqnum) > ^uint32(0) {
+		return nil,INVALID_PKT_INT
+	}
+
+	// Check message data length
+	if len(msg) > DATA_SIZE {
+		return nil,INVALID_PKT_STR
+	}
+
+	packet := Packet{DATA_PKT,seqnum,len(msg),msg}
+	return packet,nil
+}
+
+
+func PacketACK(seqnum int) (Packet,error) {
+
+	// Check sequence number size
+	if uint32(seqnum) > ^uint32(0) {
+		return nil,INVALID_PKT_INT
+	}
+
+	packet := Packet{ACK_PKT,seqnum,0,""}
+	return packet,nil
+}
+
+
+func PacketEOT() Packet {
+	packet := Packet{EOT_PKT, 0, 0,""}
+	return packet
+}
+
+
+
+
+func (packet Packet) String() (string,error) {
 
 	// Encode integer parts
 	ptype, err := Itoa32(packet.ptype)
@@ -91,28 +119,23 @@ func (packet *RDTPacket) String() (string,error) {
 
 
 
-func (packet *RDTPacket) Ptype() int {
+func (packet Packet) Ptype() int {
 	return packet.ptype
 }
 
 
-func (packet *RDTPacket) Seqnum() int {
+func (packet Packet) Seqnum() int {
 	return packet.seqnum
 }
 
 
-func (packet *RDTPacket) Length() int {
+func (packet Packet) Length() int {
 	return packet.length
 }
 
 
-func (packet *RDTPacket) Data() string {
+func (packet Packet) Data() string {
 	return packet.data
-}
-
-
-func (packet *RDTPacket) IsEOT() bool {
-	return packet.ptype == EOT.ptype
 }
 
 

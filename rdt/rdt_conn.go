@@ -1,19 +1,10 @@
 // 
 // rdt_conn.go
 // 
-// This file contains the part of the RDT wrapper that implements the net.Conn interface
-// above the provided connection. I.e., *RDTConn is a net.Conn that contains a net.Conn
-// (both aggregated and composed). For RDT specific functionalities, see rdt.go
+// RDT implementation of the net.Conn, io.ReaderFrom, and io.WriterTo interfaces.
+// RDT specific functionality can be found in rdt.go
 // 
-// The justification for this design is to
-// 
-// (i)  ensure that RDT can be applied over any other implemented connection protocol
-//      (even another RDT wrapped protocol), and
-// 
-// (ii) can still be utilized almost the same as any other connection would
-// 
-// 
-// This following are defined in this file:
+// The following are defined in this file:
 // 
 // Methods (implements net.Conn interface):
 // 	func (rdtconn *RDTConn) Read(b []byte) (int,error)
@@ -24,10 +15,6 @@
 // 	func (rdtconn *RDTConn) SetDeadline(t time.Time) error
 // 	func (rdtconn *RDTConn) SetReadDeadline(t time.Time) error
 // 	func (rdtconn *RDTConn) SetWriteDeadline(t time.Time) error
-// 
-// Constructors:
-// 	func DialRDT(network string, laddr, raddr *net.UDPAddr) (*RDTConn,error)
-// 	func ListenRDT(network string, laddr *net.UDPAddr) (*RDTConn, error)
 // 
 
 
@@ -60,7 +47,7 @@ func (rdtconn *RDTConn) Read(b []byte) (int,error) {
 		var data [PKT_SIZE]byte
 
 		// Read raw data from underlying connection
-		n, err := rdtconn.Conn.Read(data[0:])
+		n, err := rdtconn.InConn.Read(data[0:])
 		if err != nil && err != io.EOF {
 			return N,err
 		}
@@ -91,7 +78,7 @@ func (rdtconn *RDTConn) Read(b []byte) (int,error) {
 // 
 // @return (N,err): Number of bytes written
 // 
-// Implements net.Conn.Write(); DO NOT USE - unsafe.
+// Implements net.Conn.Write(); DO NOT USE - not safe.
 // 
 func (rdtconn *RDTConn) Write(b []byte) (int,error) {
 
@@ -119,7 +106,7 @@ func (rdtconn *RDTConn) Write(b []byte) (int,error) {
 			return N,err
 		}
 
-		n, err := rdtconn.Conn.Write([]byte(str))
+		n, err := rdtconn.OutConn.Write([]byte(str))
 		if err != nil {
 			return N,err
 		}
@@ -131,79 +118,9 @@ func (rdtconn *RDTConn) Write(b []byte) (int,error) {
 	if err != nil {
 		return N,err
 	}
-	_, err = rdtconn.Conn.Write([]byte(str))
+	_, err = rdtconn.OutConn.Write([]byte(str))
 
 	return N,err
-}
-
-
-
-
-// (s) DialRDT()
-// 
-// @param network: network type (recommended type: udp, udp4, udp6)
-// @param address: connection remote address
-// 
-// @return (rdtconn,err): New outgoing RDT connection
-// 
-// Mimics net.Dial() - establishes a new outgoing RDT connection.
-// 
-func DialRDT(network, address string) (*RDTConn,error) {
-
-	// Simply establish an outgoing connection
-	conn, err := net.Dial(network, address)
-	if err != nil {
-		return nil,err
-	}
-
-	return &RDTConn{conn},nil
-}
-
-
-// (s) ListenRDT()
-// 
-// @param network: network type (recommended type: udp, udp4, udp6)
-// @param laddr: Local address
-// 
-// @return (rdtconn,err) - New incoming RDT connection
-// 
-// Mimics net.Listen() - establishes a new incoming RDT connection. Note the difference
-// however; the function blocks until an incoming connection is found.
-// 
-func ListenRDT(network, address string) (*RDTConn, error) {
-
-	var conn net.Conn
-	switch network {
-
-	case "udp","udp4","udp6":
-		// Use UDP interface; this is not a modular solution for this, unfortunately.
-		// And to be honest, this is the best I can come up with atm
-		addr, err := net.ResolveUDPAddr(network, address)
-		if err != nil {
-			return nil,err
-		}
-
-		conn, err = net.ListenUDP(network, addr)
-		if err != nil {
-			return nil,err
-		}
-
-	default:
-		// Start listening for RDT connection requests
-		listener, err := net.Listen(network, address)
-		if err != nil {
-			return nil,err
-		}
-		defer listener.Close()
-
-		// Accept connection request (blocking!)
-		conn, err = listener.Accept()
-		if err != nil {
-			return nil,err
-		}
-	}
-
-	return &RDTConn{conn},nil
 }
 
 
@@ -216,7 +133,13 @@ func ListenRDT(network, address string) (*RDTConn, error) {
 // Implements net.Conn.Close().
 // 
 func (rdtconn *RDTConn) Close() error {
-	return rdtconn.Conn.Close()
+	inerr := rdtconn.InConn.Close()
+	outerr := rdtconn.OutConn.Close()
+
+	if inerr != nil {
+		return inerr
+	}
+	return outerr
 }
 
 
@@ -227,7 +150,7 @@ func (rdtconn *RDTConn) Close() error {
 // Implements net.Conn.LocalAddr().
 // 
 func (rdtconn *RDTConn) LocalAddr() net.Addr {
-	return rdtconn.Conn.LocalAddr()
+	return rdtconn.InConn.LocalAddr()
 }
 
 
@@ -238,7 +161,7 @@ func (rdtconn *RDTConn) LocalAddr() net.Addr {
 // Implements net.Conn.RemoteAddr().
 // 
 func (rdtconn *RDTConn) RemoteAddr() net.Addr {
-	return rdtconn.Conn.RemoteAddr()
+	return rdtconn.OutConn.RemoteAddr()
 }
 
 
@@ -251,7 +174,11 @@ func (rdtconn *RDTConn) RemoteAddr() net.Addr {
 // Implements net.Conn.SetDeadline().
 // 
 func (rdtconn *RDTConn) SetDeadline(t time.Time) error {
-	return rdtconn.Conn.SetDeadline(t)
+	err := rdtconn.InConn.SetReadDeadline(t)
+	if err != nil {
+		return err
+	}
+	return rdtconn.OutConn.SetWriteDeadline(t)
 }
 
 
@@ -264,7 +191,7 @@ func (rdtconn *RDTConn) SetDeadline(t time.Time) error {
 // Implements net.Conn.SetReadDeadline().
 // 
 func (rdtconn *RDTConn) SetReadDeadline(t time.Time) error {
-	return rdtconn.Conn.SetReadDeadline(t)
+	return rdtconn.InConn.SetReadDeadline(t)
 }
 
 
@@ -277,6 +204,6 @@ func (rdtconn *RDTConn) SetReadDeadline(t time.Time) error {
 // Implements net.Conn.SetWriteDeadline().
 // 
 func (rdtconn *RDTConn) SetWriteDeadline(t time.Time) error {
-	return rdtconn.Conn.SetWriteDeadline(t)
+	return rdtconn.OutConn.SetWriteDeadline(t)
 }
 
