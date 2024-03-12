@@ -44,13 +44,13 @@ func (rdtconn *RDTConn) ReadFrom(r io.Reader) (int64,error) {
 
 	// Enable logging
 	if LOGGING_ON {
-		seqfile, err := os.OpenFile(SEQNUM_LOG, os.O_WRONLY|os.O_CREATE, 0666)
+		seqfile, err := os.Create(SEQNUM_LOG)
 		if err != nil {
 			return N,err
 		}
 		defer seqfile.Close()
 
-		ackfile, err := os.OpenFile(ACK_LOG, os.O_WRONLY|os.O_CREATE, 0666)
+		ackfile, err := os.Create(ACK_LOG)
 		if err != nil {
 			return N,err
 		}
@@ -282,7 +282,7 @@ func (rdtconn *RDTConn) WriteTo(w io.Writer) (int64,error) {
 
 	// Enable logging
 	if LOGGING_ON {
-		arvfile, err := os.OpenFile(ARRIVAL_LOG, os.O_WRONLY|os.O_CREATE, 0666)
+		arvfile, err := os.Create(ARRIVAL_LOG)
 		if err != nil {
 			return N,err
 		}

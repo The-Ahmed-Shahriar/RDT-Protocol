@@ -49,7 +49,7 @@ func (rdtconn *RDTConn) SendFile(filename string) error {
 func (rdtconn *RDTConn) ReceiveFile(filename string) error {
 
 	// Validate and open file
-	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0666)
+	file, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
